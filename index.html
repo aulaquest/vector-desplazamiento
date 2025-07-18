@@ -1,1 +1,626 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador de Vector Desplazamiento v16</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- KaTeX para renderizar LaTeX -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" xintegrity="sha384-n8MVd4RsNIU0KOVEMVIhbCwHMAq2EVqFlyBoVerANl83pKpQlnp5TJqeFUcKPJCA" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" xintegrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" xintegrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous"></script>
+    <style>
+        html {
+            scroll-behavior: smooth;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            overflow-y: auto;
+        }
+        main {
+            position: relative;
+            flex-grow: 1;
+            min-height: 60vh;
+        }
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            cursor: grab;
+        }
+        canvas.grabbing {
+            cursor: grabbing;
+        }
+        input[type=range] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 8px;
+            background: #4a5568;
+            border-radius: 5px;
+            outline: none;
+            transition: background 0.3s;
+        }
+        input[type=range]:hover {
+             background: #718096;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #4fd1c5;
+            cursor: pointer;
+            border-radius: 50%;
+            border: 2px solid #1a202c;
+        }
+        input[type=range]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #4fd1c5;
+            cursor: pointer;
+            border-radius: 50%;
+            border: 2px solid #1a202c;
+        }
+        .katex { font-size: 1.1em !important; }
+        .form-checkbox {
+            -webkit-appearance: none;
+            appearance: none;
+            background-color: #4a5568;
+            border: 1px solid #718096;
+            border-radius: 0.25rem;
+            width: 1em;
+            height: 1em;
+            display: inline-block;
+            vertical-align: middle;
+            position: relative;
+            cursor: pointer;
+        }
+        .form-checkbox:checked {
+            background-color: #4fd1c5;
+            border-color: #4fd1c5;
+        }
+        .form-checkbox:checked::after {
+            content: '✔';
+            position: absolute;
+            color: #1a202c;
+            font-size: 0.8em;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200">
+
+    <!-- Columna de la Simulación -->
+    <main>
+        <canvas id="physicsCanvas"></canvas>
+        
+        <!-- Controles de Zoom -->
+        <div class="absolute bottom-4 right-4 z-10 flex flex-col space-y-2">
+            <button id="zoom-in-btn" class="bg-gray-700/50 hover:bg-gray-600/50 backdrop-blur-sm text-white font-bold w-9 h-9 flex items-center justify-center rounded-full transition-colors duration-200 text-lg shadow-lg">+</button>
+            <button id="zoom-out-btn" class="bg-gray-700/50 hover:bg-gray-600/50 backdrop-blur-sm text-white font-bold w-9 h-9 flex items-center justify-center rounded-full transition-colors duration-200 text-lg shadow-lg">-</button>
+        </div>
+    </main>
+
+    <!-- Panel de Control -->
+    <aside class="w-full bg-gray-800 p-4 border-t-2 border-cyan-500/30 flex flex-col justify-center space-y-3">
+        <!-- Fila de Controles -->
+        <div class="bg-gray-900/50 p-3 rounded-lg flex flex-col md:flex-row items-center justify-center gap-4 shadow-inner">
+            <!-- Botones -->
+            <div class="flex items-center space-x-3">
+                <button id="start-btn" class="bg-green-500 hover:bg-green-600 text-white font-bold w-9 h-9 flex items-center justify-center rounded-full transition-colors duration-200 disabled:bg-gray-500 disabled:cursor-not-allowed shadow-lg" title="Iniciar">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" /></svg>
+                </button>
+                <button id="pause-btn" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold w-9 h-9 flex items-center justify-center rounded-full transition-colors duration-200 disabled:bg-gray-500 disabled:cursor-not-allowed shadow-lg" title="Pausar" disabled>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clip-rule="evenodd" /></svg>
+                </button>
+                <button id="reset-btn" class="bg-red-500 hover:bg-red-600 text-white font-bold w-9 h-9 flex items-center justify-center rounded-full transition-colors duration-200 disabled:bg-gray-500 disabled:cursor-not-allowed shadow-lg" title="Reiniciar">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 110 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd" /></svg>
+                </button>
+            </div>
+            <!-- Slider de Tiempo -->
+            <div class="flex items-center space-x-3 text-white w-full flex-grow min-w-[250px]">
+                <label for="time-slider" class="font-medium text-sm">Tiempo:</label>
+                <input type="range" id="time-slider" min="1" max="20" value="5" step="0.1" class="flex-grow">
+                <span id="time-value" class="font-mono bg-gray-700 px-2 py-1 rounded w-20 text-center text-sm">5.00 s</span>
+            </div>
+        </div>
+        <!-- Fila de Datos -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+            <!-- Posición Inicial -->
+            <div class="bg-gray-900/50 p-3 rounded-lg h-full border-t border-green-400/30 shadow-inner">
+                <h2 class="font-bold text-sm text-green-400 mb-2">Posición Inicial ($\vec{r}_0$)</h2>
+                <div class="flex items-center space-x-2">
+                    <input type="checkbox" id="show-initial-vector" class="form-checkbox" checked>
+                    <label for="show-initial-vector" class="text-xs text-gray-400 cursor-pointer">Mostrar Valores</label>
+                </div>
+                <div id="initial-values" class="mt-2 space-y-1 text-sm">
+                    <p>Cartesianas: <span id="initial-cartesian" class="font-mono bg-gray-700 px-2 py-1 rounded-md inline-block">(0.00, 0.00)</span></p>
+                    <p>Unitarios: <span id="initial-unit" class="font-mono bg-gray-700 px-2 py-1 rounded-md inline-block">0.00 î + 0.00 ĵ</span></p>
+                </div>
+            </div>
+
+            <!-- Posición Final -->
+            <div class="bg-gray-900/50 p-3 rounded-lg h-full border-t border-blue-400/30 shadow-inner">
+                <h2 class="font-bold text-sm text-blue-400 mb-2">Posición Final ($\vec{r}_f$)</h2>
+                <div class="flex items-center space-x-2">
+                    <input type="checkbox" id="show-final-vector" class="form-checkbox">
+                    <label for="show-final-vector" class="text-xs text-gray-400 cursor-pointer">Mostrar Valores</label>
+                </div>
+                <div id="final-values" class="mt-2 space-y-1 text-sm">
+                    <p>Cartesianas: <span id="final-cartesian" class="font-mono bg-gray-700 px-2 py-1 rounded-md inline-block">(--, --)</span></p>
+                    <p>Unitarios: <span id="final-unit" class="font-mono bg-gray-700 px-2 py-1 rounded-md inline-block">-- î + -- ĵ</span></p>
+                </div>
+            </div>
+
+            <!-- Vector Desplazamiento -->
+            <div class="bg-gray-900/50 p-3 rounded-lg h-full border-t border-fuchsia-400/30 shadow-inner">
+                <h2 class="font-bold text-sm text-fuchsia-400 mb-2">Vector Desplazamiento ($\Delta\vec{r}$)</h2>
+                <div class="flex items-center space-x-2">
+                    <input type="checkbox" id="show-displacement-vector" class="form-checkbox">
+                    <label for="show-displacement-vector" class="text-xs text-gray-400 cursor-pointer">Mostrar Valores</label>
+                </div>
+                <div id="displacement-values" class="mt-2 space-y-1 text-sm">
+                    <p>Cartesianas: <span id="displacement-cartesian" class="font-mono bg-gray-700 px-2 py-1 rounded-md inline-block">(--, --)</span></p>
+                    <p>Unitarios: <span id="displacement-unit" class="font-mono bg-gray-700 px-2 py-1 rounded-md inline-block">-- î + -- ĵ</span></p>
+                </div>
+            </div>
+        </div>
+        <!-- Fila de Módulo -->
+        <div class="bg-gray-900/50 p-3 mt-4 rounded-lg h-full border-t border-cyan-400/30 shadow-inner">
+            <h2 class="font-bold text-sm text-cyan-400 mb-2">Módulo del Desplazamiento $|\Delta\vec{r}|$</h2>
+            <div class="flex items-center space-x-2">
+                <input type="checkbox" id="show-modulus" class="form-checkbox">
+                <label for="show-modulus" class="text-xs text-gray-400 cursor-pointer">Mostrar Cálculo</label>
+            </div>
+            <div id="modulus-values" class="mt-2 space-y-2 text-sm text-center">
+                <p id="modulus-general-formula">$$ |\Delta\vec{r}| = \sqrt{(x_f - x_0)^2 + (y_f - y_0)^2} $$</p>
+                <p id="modulus-substitution" class="text-cyan-300"></p>
+                <p id="modulus-result" class="font-bold text-lg text-white"></p>
+            </div>
+        </div>
+    </aside>
+
+    <footer class="w-full text-center p-4 mt-auto">
+        <p class="text-xs text-gray-500">
+            Simulación creada por 
+            <a href="https://aulaquest.com" target="_blank" rel="noopener noreferrer" class="text-cyan-400 hover:text-cyan-300">
+                AulaQuest
+            </a>
+        </p>
+    </footer>
+
+    <script>
+        // --- CONFIGURACIÓN INICIAL Y VARIABLES DE ESTADO ---
+        const canvas = document.getElementById('physicsCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Referencias a elementos del DOM
+        const timeSlider = document.getElementById('time-slider');
+        const timeValue = document.getElementById('time-value');
+        const startBtn = document.getElementById('start-btn');
+        const pauseBtn = document.getElementById('pause-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const zoomInBtn = document.getElementById('zoom-in-btn');
+        const zoomOutBtn = document.getElementById('zoom-out-btn');
+        const showInitialVecCheck = document.getElementById('show-initial-vector');
+        const showFinalVecCheck = document.getElementById('show-final-vector');
+        const showDisplacementVecCheck = document.getElementById('show-displacement-vector');
+        const showModulusCheck = document.getElementById('show-modulus');
+        const initialValuesDiv = document.getElementById('initial-values');
+        const finalValuesDiv = document.getElementById('final-values');
+        const displacementValuesDiv = document.getElementById('displacement-values');
+        const modulusValuesDiv = document.getElementById('modulus-values');
+        const modulusSubstitutionP = document.getElementById('modulus-substitution');
+        const modulusResultP = document.getElementById('modulus-result');
+
+        // Estado de la simulación
+        let isDragging = false;
+        let isPanning = false;
+        let panStart = { x: 0, y: 0 };
+        let isRunning = false;
+        let isPaused = false;
+        let animationFrameId;
+        let startTime, elapsedTime = 0;
+        let totalTime = parseFloat(timeSlider.value);
+
+        // Parámetros del mundo físico y del canvas
+        let origin = { x: 0, y: 0 };
+        let scale = 40; // Píxeles por unidad
+        const velocityX = 2.5; // Unidades por segundo
+        let initialPos = { x: 2, y: 0 }; // Posición inicial en coordenadas del mundo
+        let finalPos = { x: null, y: null };
+        let displacementVec = { x: null, y: null };
+
+        const trajectoryFunction = (x) => 2.5 * Math.sin(x / 1.5) + 0.5 * Math.cos(x * 2);
+
+        // --- FUNCIONES DE INICIALIZACIÓN Y DIBUJO ---
+
+        function setup() {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+            origin = { x: canvas.width / 4, y: canvas.height / 2 };
+            
+            cancelAnimationFrame(animationFrameId);
+            isRunning = false;
+            isPaused = false;
+            elapsedTime = 0;
+            
+            initialPos.y = trajectoryFunction(initialPos.x);
+            finalPos = { x: null, y: null };
+            displacementVec = { x: null, y: null };
+
+            updateUI();
+            updateValuesVisibility();
+            updateButtonStates();
+            draw();
+        }
+
+        function draw() {
+            ctx.fillStyle = '#1a202c';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            drawGrid();
+            drawTrajectory();
+
+            if (initialPos.x !== null) {
+                drawVector(initialPos, '#48bb78', 'r₀');
+            }
+            if (finalPos.x !== null) {
+                drawVector(finalPos, '#4299e1', 'r_f');
+                drawDisplacementVector(initialPos, finalPos, '#d946ef', 'Δr');
+            }
+            
+            if (!isRunning) {
+                drawDraggablePoint(initialPos);
+            }
+        }
+
+        function drawGrid() {
+            ctx.strokeStyle = '#2d3748';
+            ctx.lineWidth = 1;
+            ctx.font = `${Math.max(8, 0.25 * scale)}px Inter`;
+            ctx.fillStyle = '#718096';
+
+            const step = scale > 20 ? 1 : (scale > 10 ? 2 : 5);
+            const worldBounds = {
+                left: canvasToWorld(0, 0).x,
+                right: canvasToWorld(canvas.width, 0).x,
+                top: canvasToWorld(0, 0).y,
+                bottom: canvasToWorld(0, canvas.height).y
+            };
+
+            for (let x = Math.floor(worldBounds.left / step) * step; x < worldBounds.right; x += step) {
+                const px = worldToCanvas(x, 0).x;
+                ctx.beginPath();
+                ctx.moveTo(px, 0);
+                ctx.lineTo(px, canvas.height);
+                ctx.stroke();
+                if (x !== 0) ctx.fillText(x.toFixed(0), px + 5, origin.y - 5);
+            }
+            for (let y = Math.floor(worldBounds.bottom / step) * step; y < worldBounds.top; y += step) {
+                const py = worldToCanvas(0, y).y;
+                ctx.beginPath();
+                ctx.moveTo(0, py);
+                ctx.lineTo(canvas.width, py);
+                ctx.stroke();
+                if (y !== 0) ctx.fillText(y.toFixed(0), origin.x + 5, py - 5);
+            }
+
+            ctx.strokeStyle = '#718096';
+            ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(0, origin.y); ctx.lineTo(canvas.width, origin.y); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(origin.x, 0); ctx.lineTo(origin.x, canvas.height); ctx.stroke();
+        }
+
+        function drawTrajectory() {
+            ctx.strokeStyle = '#63b3ed';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            const startPoint = canvasToWorld(0, 0);
+            const endPoint = canvasToWorld(canvas.width, 0);
+
+            for (let x = startPoint.x; x < endPoint.x; x += 0.05) {
+                const y = trajectoryFunction(x);
+                const canvasP = worldToCanvas(x, y);
+                if (x === startPoint.x) ctx.moveTo(canvasP.x, canvasP.y);
+                else ctx.lineTo(canvasP.x, canvasP.y);
+            }
+            ctx.stroke();
+        }
+
+        function drawVector(pos, color, label) {
+            const canvasPos = worldToCanvas(pos.x, pos.y);
+            ctx.strokeStyle = color;
+            ctx.fillStyle = color;
+            ctx.lineWidth = 4;
+
+            ctx.beginPath();
+            ctx.moveTo(origin.x, origin.y);
+            ctx.lineTo(canvasPos.x, canvasPos.y);
+            ctx.stroke();
+            drawArrowhead(origin, canvasPos, color);
+
+            const angle = Math.atan2(canvasPos.y - origin.y, canvasPos.x - origin.x);
+            const labelOffset = Math.max(15, 0.3 * scale);
+            const offsetX = -Math.sin(angle) * labelOffset;
+            const offsetY = Math.cos(angle) * labelOffset;
+            ctx.font = `bold ${Math.max(12, 0.35 * scale)}px Inter`;
+            ctx.fillText(label, (origin.x + canvasPos.x) / 2 + offsetX, (origin.y + canvasPos.y) / 2 + offsetY);
+        }
+
+        function drawDisplacementVector(start, end, color, label) {
+            const canvasStart = worldToCanvas(start.x, start.y);
+            const canvasEnd = worldToCanvas(end.x, end.y);
+            ctx.strokeStyle = color;
+            ctx.fillStyle = color;
+            ctx.lineWidth = 4;
+            
+            ctx.beginPath();
+            ctx.moveTo(canvasStart.x, canvasStart.y);
+            ctx.lineTo(canvasEnd.x, canvasEnd.y);
+            ctx.stroke();
+            drawArrowhead(canvasStart, canvasEnd, color);
+
+            const angle = Math.atan2(canvasEnd.y - canvasStart.y, canvasEnd.x - canvasStart.x);
+            const labelOffset = Math.max(15, 0.3 * scale);
+            const offsetX = -Math.sin(angle) * labelOffset;
+            const offsetY = Math.cos(angle) * labelOffset;
+            ctx.font = `bold ${Math.max(12, 0.35 * scale)}px Inter`;
+            ctx.fillText(label, (canvasStart.x + canvasEnd.x) / 2 + offsetX, (canvasStart.y + canvasEnd.y) / 2 + offsetY);
+        }
+        
+        function drawArrowhead(from, to, color) {
+            const angle = Math.atan2(to.y - from.y, to.x - from.x);
+            const headlen = Math.max(10, 0.3 * scale);
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.moveTo(to.x, to.y);
+            ctx.lineTo(to.x - headlen * Math.cos(angle - Math.PI / 6), to.y - headlen * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(to.x - headlen * Math.cos(angle + Math.PI / 6), to.y - headlen * Math.sin(angle + Math.PI / 6));
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        function drawDraggablePoint(pos) {
+            const canvasPos = worldToCanvas(pos.x, pos.y);
+            ctx.beginPath();
+            ctx.arc(canvasPos.x, canvasPos.y, Math.max(6, 0.2 * scale), 0, 2 * Math.PI);
+            ctx.fillStyle = '#48bb78';
+            ctx.fill();
+            ctx.strokeStyle = '#1a202c';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+        }
+
+        // --- LÓGICA DE LA SIMULACIÓN Y ANIMACIÓN ---
+
+        function animate(timestamp) {
+            if (!startTime) startTime = timestamp;
+            if (!isPaused) elapsedTime = Math.min(timestamp - startTime, totalTime * 1000);
+
+            const timeInSeconds = elapsedTime / 1000;
+            const currentX = initialPos.x + velocityX * timeInSeconds;
+            finalPos = {
+                x: currentX,
+                y: trajectoryFunction(currentX)
+            };
+            
+            displacementVec = { x: finalPos.x - initialPos.x, y: finalPos.y - initialPos.y };
+            
+            updateUI();
+            draw();
+
+            if (elapsedTime < totalTime * 1000) {
+                animationFrameId = requestAnimationFrame(animate);
+            } else {
+                isRunning = false;
+                updateUI();
+                updateButtonStates();
+                draw();
+            }
+        }
+
+        // --- MANEJADORES DE EVENTOS ---
+        
+        function handleMouseDown(e) {
+            if (isRunning) return;
+            const mousePos = getMousePos(e);
+            const initialCanvasPos = worldToCanvas(initialPos.x, initialPos.y);
+            const dist = Math.hypot(mousePos.x - initialCanvasPos.x, mousePos.y - initialCanvasPos.y);
+            if (dist < 15) {
+                isDragging = true;
+                canvas.classList.add('grabbing');
+            } else {
+                isPanning = true;
+                panStart = mousePos;
+                canvas.classList.add('grabbing');
+            }
+        }
+
+        function handleMouseMove(e) {
+            if (isDragging) {
+                const mousePos = getMousePos(e);
+                let worldPos = canvasToWorld(mousePos.x, mousePos.y);
+
+                // CAMBIO: Limitar el movimiento del punto a los bordes del canvas
+                const viewBoundsX = {
+                    left: canvasToWorld(0, 0).x,
+                    right: canvasToWorld(canvas.width, 0).x
+                };
+                
+                // Se asegura que la coordenada X del punto no se salga de la vista horizontal
+                worldPos.x = Math.max(viewBoundsX.left, Math.min(worldPos.x, viewBoundsX.right));
+
+                // Se actualiza la posición inicial basándose en el X limitado y la trayectoria
+                initialPos.x = worldPos.x;
+                initialPos.y = trajectoryFunction(initialPos.x); 
+                
+                updateUI();
+                draw();
+            } else if (isPanning) {
+                const mousePos = getMousePos(e);
+                origin.x += mousePos.x - panStart.x;
+                origin.y += mousePos.y - panStart.y;
+                panStart = mousePos;
+                draw();
+            }
+        }
+
+        function handleMouseUp() {
+            isDragging = false;
+            isPanning = false;
+            canvas.classList.remove('grabbing');
+        }
+        
+        function getMousePos(evt) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = evt.clientX || (evt.touches && evt.touches[0].clientX);
+            const clientY = evt.clientY || (evt.touches && evt.touches[0].clientY);
+            return { x: clientX - rect.left, y: clientY - rect.top };
+        }
+
+        startBtn.addEventListener('click', () => {
+            if (isRunning) return;
+            isRunning = true;
+            isPaused = false;
+            startTime = null;
+            elapsedTime = 0;
+            finalPos = { ...initialPos };
+            displacementVec = { x: 0, y: 0 };
+            updateButtonStates();
+            animationFrameId = requestAnimationFrame(animate);
+        });
+
+        pauseBtn.addEventListener('click', () => {
+            if (!isRunning) return;
+            isPaused = !isPaused;
+            if (isPaused) {
+                cancelAnimationFrame(animationFrameId);
+                pauseBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" /></svg>`;
+                pauseBtn.title = "Reanudar";
+            } else {
+                startTime = performance.now() - elapsedTime;
+                pauseBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clip-rule="evenodd" /></svg>`;
+                pauseBtn.title = "Pausar";
+                animationFrameId = requestAnimationFrame(animate);
+            }
+        });
+
+        resetBtn.addEventListener('click', setup);
+
+        timeSlider.addEventListener('input', (e) => {
+            totalTime = parseFloat(e.target.value);
+            timeValue.textContent = `${totalTime.toFixed(2)} s`;
+        });
+
+        zoomInBtn.addEventListener('click', () => { scale *= 1.2; draw(); });
+        zoomOutBtn.addEventListener('click', () => { scale /= 1.2; draw(); });
+        
+        function handleVisibilityChange() {
+            updateValuesVisibility();
+        }
+
+        showInitialVecCheck.addEventListener('change', handleVisibilityChange);
+        showFinalVecCheck.addEventListener('change', handleVisibilityChange);
+        showDisplacementVecCheck.addEventListener('change', handleVisibilityChange);
+        showModulusCheck.addEventListener('change', handleVisibilityChange);
+
+        // --- FUNCIONES UTILITARIAS Y DE UI ---
+
+        function updateValuesVisibility() {
+            initialValuesDiv.style.display = showInitialVecCheck.checked ? 'block' : 'none';
+            finalValuesDiv.style.display = showFinalVecCheck.checked ? 'block' : 'none';
+            displacementValuesDiv.style.display = showDisplacementVecCheck.checked ? 'block' : 'none';
+            modulusValuesDiv.style.display = showModulusCheck.checked ? 'block' : 'none';
+        }
+
+        function canvasToWorld(cx, cy) { return { x: (cx - origin.x) / scale, y: (origin.y - cy) / scale }; }
+        function worldToCanvas(wx, wy) { return { x: origin.x + wx * scale, y: origin.y - wy * scale }; }
+
+        function updateUI() {
+            document.getElementById('initial-cartesian').textContent = `(${initialPos.x.toFixed(2)}, ${initialPos.y.toFixed(2)})`;
+            document.getElementById('initial-unit').textContent = `${initialPos.x.toFixed(2)} î + ${initialPos.y.toFixed(2)} ĵ`;
+
+            if (finalPos.x !== null) {
+                document.getElementById('final-cartesian').textContent = `(${finalPos.x.toFixed(2)}, ${finalPos.y.toFixed(2)})`;
+                document.getElementById('final-unit').textContent = `${finalPos.x.toFixed(2)} î + ${finalPos.y.toFixed(2)} ĵ`;
+            } else {
+                document.getElementById('final-cartesian').textContent = `(--, --)`;
+                document.getElementById('final-unit').textContent = `-- î + -- ĵ`;
+            }
+            
+            if (displacementVec.x !== null) {
+                const ix = initialPos.x;
+                const iy = initialPos.y;
+                const fx = finalPos.x;
+                const fy = finalPos.y;
+                const dx = displacementVec.x;
+                const dy = displacementVec.y;
+                const modulus = Math.hypot(dx, dy);
+
+                document.getElementById('displacement-cartesian').textContent = `(${dx.toFixed(2)}, ${dy.toFixed(2)})`;
+                document.getElementById('displacement-unit').textContent = `${dx.toFixed(2)} î + ${dy.toFixed(2)} ĵ`;
+                
+                const substitutionLatex = `|\\Delta\\vec{r}| = \\sqrt{(${fx.toFixed(2)} - (${ix >= 0 ? '' : '('}${ix.toFixed(2)}${ix >= 0 ? '' : ')'}))^2 + (${fy.toFixed(2)} - (${iy >= 0 ? '' : '('}${iy.toFixed(2)}${iy >= 0 ? '' : ')'}))^2}`;
+                const resultLatex = `|\\Delta\\vec{r}| \\approx ${modulus.toFixed(3)}`;
+                
+                try {
+                    katex.render(substitutionLatex, modulusSubstitutionP, { throwOnError: false, displayMode: true });
+                    katex.render(resultLatex, modulusResultP, { throwOnError: false, displayMode: true });
+                } catch (e) {
+                    console.error("Error al renderizar Katex:", e);
+                    modulusSubstitutionP.textContent = 'Error en fórmula';
+                    modulusResultP.textContent = '';
+                }
+
+            } else {
+                document.getElementById('displacement-cartesian').textContent = `(--, --)`;
+                document.getElementById('displacement-unit').textContent = `-- î + -- ĵ`;
+                modulusSubstitutionP.innerHTML = '';
+                modulusResultP.innerHTML = '';
+            }
+        }
+
+        function updateButtonStates() {
+            startBtn.disabled = isRunning;
+            pauseBtn.disabled = !isRunning;
+            resetBtn.disabled = isRunning && !isPaused;
+            timeSlider.disabled = isRunning;
+            if (!isRunning) {
+                pauseBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clip-rule="evenodd" /></svg>`;
+                pauseBtn.title = 'Pausar';
+            }
+        }
+
+        // --- INICIO Y EVENTOS DE VENTANA ---
+        document.addEventListener('DOMContentLoaded', () => {
+            renderMathInElement(document.body, {
+                delimiters: [
+                    {left: '$$', right: '$$', display: true},
+                    {left: '$', right: '$', display: false}
+                ]
+            });
+            setup();
+        });
+        window.addEventListener('resize', setup);
+        canvas.addEventListener('mousedown', handleMouseDown);
+        canvas.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('mouseup', handleMouseUp);
+        canvas.addEventListener('touchstart', (e) => { e.preventDefault(); handleMouseDown(e); }, { passive: false });
+        canvas.addEventListener('touchmove', (e) => { e.preventDefault(); handleMouseMove(e); }, { passive: false });
+        window.addEventListener('touchend', handleMouseUp);
+    </script>
+</body>
+</html>
 
